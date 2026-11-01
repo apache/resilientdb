@@ -143,11 +143,34 @@ cc_test(
     ],
 )
 
+cc_library(
+    name = "duckdb_storage",
+    srcs = ["duckdb.cpp"],
+    hdrs = ["duckdb.h"],
+    deps = [
+        ":storage",
+        "//chain/storage/proto:duckdb_config_cc_proto",
+        "//third_party:duckdb",
+        "//common:glog",
+    ],
+)
+
 cc_binary(
     name = "ipfs_integration_test",
     srcs = ["ipfs_integration_test.cpp"],
     deps = [
         ":ipfs_client",
         "//chain/storage/proto:ipfs_config_cc_proto",
+    ],
+)
+
+cc_binary(
+    name = "duckdb_test",
+    srcs = ["duckdb_test.cpp"],
+    deps = [
+        ":duckdb_storage",
+        "//third_party:duckdb",
+        "//common:glog",
+        "//chain/storage/proto:duckdb_config_cc_proto",
     ],
 )

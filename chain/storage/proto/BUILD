@@ -62,3 +62,13 @@ cc_proto_library(
     name = "tiered_index_cc_proto",
     deps = [":tiered_index_proto"],
 )
+
+proto_library(
+    name = "duckdb_config_proto",
+    srcs = ["duckdb_config.proto"],
+)
+
+cc_proto_library(
+    name = "duckdb_config_cc_proto",
+    deps = [":duckdb_config_proto"],
+)
