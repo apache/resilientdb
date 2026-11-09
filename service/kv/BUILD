@@ -37,8 +37,13 @@ cc_binary(
         "//chain/storage:memory_db",
         "//chain/storage:duckdb_storage",
         "//chain/storage/proto:duckdb_config_cc_proto",
-	] + select({
-        "//chain/storage/setting:enable_leveldb_setting": ["//chain/storage:leveldb"],
+    ] + select({
+        "//chain/storage/setting:enable_leveldb_setting": [
+            "//chain/storage:leveldb",
+            "//chain/storage:tiered_storage",
+            "//chain/storage:ipfs_client",
+            "//chain/storage/proto:ipfs_config_cc_proto",
+        ],
         "//conditions:default": [],
     }),
 )

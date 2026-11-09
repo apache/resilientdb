@@ -19,6 +19,7 @@
 
 #include <glog/logging.h>
 
+#include <sys/stat.h>
 #include <algorithm>
 #include <cctype>
 #include <string>
@@ -32,6 +33,8 @@
 #include "service/utils/server_factory.h"
 #ifdef ENABLE_LEVELDB
 #include "chain/storage/leveldb.h"
+#include "chain/storage/tiered_storage.h"
+#include "chain/storage/ipfs_client.h"
 #endif
 
 using namespace resdb;
@@ -55,12 +58,65 @@ std::unique_ptr<Storage> NewStorage(const std::string& db_path,
     LOG(INFO) << "use duckdb storage, path=" << duckdb_info.path();
     return NewDuckDB(duckdb_info.path(), duckdb_info);
   }
+  LOG(ERROR) << "NewStorage: has_storage_config=" << config_data.has_storage_config();
 #ifdef ENABLE_LEVELDB
-  LOG(INFO) << "use leveldb storage.";
-  return NewResLevelDB(db_path, config_data.leveldb_info());
-#endif
-  LOG(INFO) << "use memory storage.";
+  if (!config_data.has_storage_config()) {
+    LOG(ERROR) << "NewStorage: no storage config, using MemoryDB";
+    return NewMemoryDB();
+  }
+
+  const auto& storage_config = config_data.storage_config();
+  auto backend = storage_config.backend();
+
+  if (backend == StorageConfig::MEMORYDB) {
+    LOG(ERROR) << "NewStorage: using MemoryDB only";
+    return NewMemoryDB();
+  }
+
+  if (backend == StorageConfig::LEVELDB_ONLY) {
+    LOG(ERROR) << "NewStorage: using LevelDB only";
+    return NewResLevelDB(db_path, config_data.leveldb_info());
+  }
+
+  if (backend == StorageConfig::TIERED) {
+    const auto& tiered_info = storage_config.tiered_info();
+
+    mkdir(db_path.c_str(), 0755);
+
+    std::unique_ptr<Storage> hot;
+    if (tiered_info.hot_backend() == TieredStorageConfig::LEVELDB) {
+      LOG(ERROR) << "NewStorage: using Tiered with LevelDB hot tier";
+      hot = NewResLevelDB(db_path, config_data.leveldb_info());
+    } else {
+      LOG(ERROR) << "NewStorage: using Tiered with MemoryDB hot tier";
+      hot = NewMemoryDB();
+    }
+
+    std::string warm_path = db_path + "_manifest_db";
+    auto warm = NewResLevelDB(warm_path, config_data.leveldb_info());
+    auto ipfs = IPFSClient::Create(storage_config.ipfs_info());
+
+    TieredStorageConfig tiered_config = tiered_info;
+    tiered_config.set_enabled(true);
+    tiered_config.set_auto_migration_enabled(true);
+
+    auto tiered = TieredStorage::Create(
+        std::move(hot), std::move(warm),
+        storage_config.ipfs_info(), tiered_config);
+
+    LOG(ERROR) << "TieredStorage created: hot_backend="
+              << tiered_info.hot_backend()
+              << " cold_threshold=" << tiered_config.cold_threshold_checkpoint()
+              << " ipfs_endpoint=" << storage_config.ipfs_info().api_endpoint();
+    return tiered;
+  }
+
+  LOG(ERROR) << "NewStorage: unknown backend, using MemoryDB";
   return NewMemoryDB();
+#else
+  LOG(ERROR) << "NewStorage: LevelDB disabled, using MemoryDB";
+  return NewMemoryDB();
+#endif
 }
 
 int main(int argc, char** argv) {

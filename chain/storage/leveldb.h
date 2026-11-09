@@ -29,6 +29,8 @@
 #include "leveldb/db.h"
 #include "leveldb/write_batch.h"
 #include "platform/statistic/stats.h"
+#include "absl/base/thread_annotations.h"
+#include "absl/synchronization/mutex.h"
 
 namespace resdb {
 namespace storage {
@@ -38,7 +40,7 @@ std::unique_ptr<Storage> NewResLevelDB(
 std::unique_ptr<Storage> NewResLevelDB(
     std::optional<LevelDBInfo> config = std::nullopt);
 
-class ResLevelDB : public Storage {
+class ResLevelDB : public Storage, public DeletableStorage {
  public:
   ResLevelDB(std::optional<LevelDBInfo> config_data = std::nullopt);
 
@@ -80,6 +82,8 @@ class ResLevelDB : public Storage {
 
   virtual int SetLastCheckpoint(uint64_t ckpt);
 
+  bool DeleteKey(const std::string& key) override;
+
  private:
   void CreateDB(const std::string& path);
   uint64_t GetLastCheckpointInternal();
@@ -88,6 +92,7 @@ class ResLevelDB : public Storage {
  private:
   std::unique_ptr<leveldb::DB> db_ = nullptr;
   ::leveldb::WriteBatch batch_;
+  absl::Mutex batch_mutex_;
   unsigned int write_buffer_size_ = 64 << 20;
   unsigned int write_batch_size_ = 1;
 

@@ -55,6 +55,53 @@ cc_library(
         "//common/lru:lru_cache",
         "//platform/statistic:stats",
         "//third_party:leveldb",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/synchronization",
+    ],
+)
+
+cc_library(
+    name = "ipfs_client",
+    srcs = ["ipfs_client.cpp"],
+    hdrs = ["ipfs_client.h"],
+    deps = [
+        ":storage",
+        "//chain/storage/proto:ipfs_config_cc_proto",
+        "//common:comm",
+        "@boost//:asio",
+        "@boost//:beast",
+    ],
+)
+
+cc_library(
+    name = "secondary_index",
+    hdrs = ["interface/secondary_index.h"],
+    deps = [],
+)
+
+cc_library(
+    name = "in_memory_index",
+    srcs = ["in_memory_index.cpp"],
+    hdrs = ["in_memory_index.h"],
+    deps = [
+        ":secondary_index",
+    ],
+)
+
+cc_library(
+    name = "tiered_storage",
+    srcs = ["tiered_storage.cpp"],
+    hdrs = ["tiered_storage.h"],
+    deps = [
+        ":in_memory_index",
+        ":leveldb",
+        ":storage",
+        ":ipfs_client",
+        "//chain/storage/proto:ipfs_config_cc_proto",
+        "//chain/storage/proto:tiered_index_cc_proto",
+        "//common:comm",
+        "@com_google_absl//absl/base",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -82,6 +129,20 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "tiered_storage_test",
+    size = "small",
+    timeout = "short",
+    srcs = ["tiered_storage_test.cpp"],
+    deps = [
+        ":leveldb",
+        ":memory_db",
+        ":tiered_storage",
+        ":ipfs_client",
+        "//common/test:test_main",
+    ],
+)
+
 cc_library(
     name = "duckdb_storage",
     srcs = ["duckdb.cpp"],
@@ -91,6 +152,15 @@ cc_library(
         "//chain/storage/proto:duckdb_config_cc_proto",
         "//third_party:duckdb",
         "//common:glog",
+    ],
+)
+
+cc_binary(
+    name = "ipfs_integration_test",
+    srcs = ["ipfs_integration_test.cpp"],
+    deps = [
+        ":ipfs_client",
+        "//chain/storage/proto:ipfs_config_cc_proto",
     ],
 )
 
